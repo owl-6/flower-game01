@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>种花得花</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #c9f0ff, #a6e3e9);
+      color: #2c3e50;
+      text-align: center;
+      padding: 20px;
+      user-select: none;
+    }
+    h1 {
+      margin-bottom: 1rem;
+      font-weight: 700;
+      color: #0b3954;
+    }
+    #flowerDisplay {
+      font-size: 5rem;
+      margin: 20px 0;
+      transition: transform 0.3s ease;
+      user-select: none;
+      display: inline-block;
+    }
+    #flowerMessage {
+      font-size: 1.3rem;
+      color: #2e7d32;
+      font-weight: 600;
+      margin-bottom: 15px;
+      min-height: 1.5em;
+      height: 1.5em;
+    }
+    .stats {
+      max-width: 300px;
+      margin: 10px auto 20px auto;
+      text-align: left;
+      font-size: 1.2rem;
+    }
+    .stat-label {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 14px;
+      border-radius: 7px;
+      background: #e0e0e0;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 7px;
+      background: #76c7c0;
+      transition: width 0.3s ease;
+    }
+    .buttons {
+      margin-top: 15px;
+    }
+    button {
+      background-color: #59c3c3;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      margin: 6px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: background-color 0.2s ease;
+      user-select: none;
+    }
+    button:hover {
+      background-color: #3aa0a0;
+    }
+    #coinDisplay {
+      font-weight: 700;
+      font-size: 1.3rem;
+      margin-top: 20px;
+      color: #055160;
+    }
+
+    /* 放大抖动动画 */
+    @keyframes shakeScale {
+      0%   { transform: scale(1) rotate(0deg); }
+      25%  { transform: scale(1.15) rotate(5deg); }
+      50%  { transform: scale(1.1) rotate(-5deg); }
+      75%  { transform: scale(1.15) rotate(3deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+    .bloom-shake {
+      animation: shakeScale 0.6s ease forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>种花得花</h1>
+
+  <div id="flowerDisplay" style="font-size: 2rem;"> </div>
+  <div id="flowerMessage"></div>
+
+  <div class="stats">
+    <div class="stat-label">❤️ 健康</div>
+    <div class="progress-bar"><div id="healthBar" class="progress-fill" style="width: 0%;"></div></div>
+
+    <div class="stat-label">🌿 成长</div>
+    <div class="progress-bar"><div id="growthBar" class="progress-fill" style="width: 0%;"></div></div>
+
+    <div class="stat-label">😊 心情</div>
+    <div class="progress-bar"><div id="moodBar" class="progress-fill" style="width: 0%;"></div></div>
+  </div>
+
+  <div class="buttons">
+    <button id="plantBtn">种花 🌱 (消耗 50 金币)</button>
+    <button id="waterBtn" disabled>浇水 💧</button>
+    <button id="fertilizeBtn" disabled>施肥 🌿</button>
+    <button id="sellBtn" disabled>卖花 💰</button>
+  </div>
+
+  <div style="margin-top:20px;">
+    <button id="musicToggle" aria-label="播放/暂停背景音乐" style="font-size:24px; background:none; border:none; cursor:pointer;">
+      🔈
+    </button>
+  </div>
+
+  <div id="coinDisplay">金币: 80</div>
+
+  <!-- 卖花弹窗 -->
+  <div id="sellDialog" style="
+    display:none;
+    position: fixed;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    width: 280px;
+    padding: 20px;
+    font-size: 1.1rem;
+    text-align: center;
+    z-index: 9999;
+  ">
+    <div id="sellDialogContent" style="margin-bottom: 15px;"></div>
+    <button id="sellDialogClose" style="
+      padding: 8px 16px;
+      border:none;
+      border-radius: 8px;
+      background-color: #59c3c3;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    ">确定</button>
+  </div>
+
+  <audio id="bgm" loop src="https://cdn.pixabay.com/download/audio/2023/03/08/audio_191db853e3.mp3?filename=healing-flute-141646.mp3"></audio>
+  <audio id="clickSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_76bfe34be5.mp3?filename=mouse-click-124467.mp3"></audio>
+
+<script>
+  const flowerDisplay = document.getElementById('flowerDisplay');
+  const flowerMessage = document.getElementById('flowerMessage');
+  const healthBar = document.getElementById('healthBar');
+  const growthBar = document.getElementById('growthBar');
+  const moodBar = document.getElementById('moodBar');
+  const coinDisplay = document.getElementById('coinDisplay');
+
+  const plantBtn = document.getElementById('plantBtn');
+  const waterBtn = document.getElementById('waterBtn');
+  const fertilizeBtn = document.getElementById('fertilizeBtn');
+  const sellBtn = document.getElementById('sellBtn');
+  const musicToggle = document.getElementById('musicToggle');
+
+  const sellDialog = document.getElementById('sellDialog');
+  const sellDialogContent = document.getElementById('sellDialogContent');
+  const sellDialogClose = document.getElementById('sellDialogClose');
+
+  const bgm = document.getElementById('bgm');
+  const clickSound = document.getElementById('clickSound');
+
+  let flower = null;
+  let coins = 80;
+  let bloomTriggered = false;
+
+  const bloomFlowers = ['🌹', '🌻', '🌼', '🌷', '🌸', '💐', '🌺', '🌻', '🥀', '🌻', '🌼'];
+  const quotes = [
+    "生命因努力而美丽。",
+    "每一次付出都会开花结果。",
+    "坚持，就是最美的成长。",
+    "阳光总在风雨后。",
+    "播种希望，收获梦想。",
+    "疲惫时，记得给自己一个温柔的拥抱。",
+    "哪怕很慢，也要坚定地走下去。",
+    "黑暗过后，必有光明。",
+    "你值得被温柔以待，未来会更好。",
+    "今天再难，也是成长的养分。"
+  ];
+
+  function playClick() {
+    clickSound.currentTime = 0;
+    clickSound.play();
+  }
+
+  function updateFlowerIcon() {
+    if (!flower) {
+      flowerDisplay.textContent = '';
+      flowerDisplay.style.fontSize = '2rem';
+      flowerMessage.textContent = '';
+      bloomTriggered = false;
+      return;
+    }
+    if (flower.growth < 60) {
+      flowerDisplay.style.fontSize = (2 + 3 * (flower.growth / 60)) + 'rem';
+      flowerDisplay.textContent = '🌱';
+      flowerMessage.textContent = '';
+      bloomTriggered = false;
+    } else if (flower.health >= 60 && flower.growth >= 60 && flower.mood >= 60) {
+      if (!bloomTriggered) {
+        flower.bloomEmoji = bloomFlowers[Math.floor(Math.random() * bloomFlowers.length)];
+        flowerDisplay.textContent = flower.bloomEmoji;
+        flowerDisplay.style.fontSize = '5rem';
+        flowerMessage.textContent = '你的花开了，恭喜你！🌟';
+
+        flowerDisplay.classList.add('bloom-shake');
+        flowerDisplay.addEventListener('animationend', () => {
+          flowerDisplay.classList.remove('bloom-shake');
+        }, { once: true });
+
+        bloomTriggered = true;
+      }
+    } else {
+      flowerDisplay.textContent = '🌸';
+      flowerDisplay.style.fontSize = '5rem';
+      flowerMessage.textContent = '';
+      bloomTriggered = false;
+    }
+  }
+
+  function updateUI() {
+    if (!flower) {
+      healthBar.style.width = '0%';
+      growthBar.style.width = '0%';
+      moodBar.style.width = '0%';
+      waterBtn.disabled = true;
+      fertilizeBtn.disabled = true;
+      sellBtn.disabled = true;
+      coinDisplay.textContent = `金币: ${coins}`;
+      updateFlowerIcon();
+      return;
+    }
+    healthBar.style.width = flower.health + '%';
+    growthBar.style.width = flower.growth + '%';
+    moodBar.style.width = flower.mood + '%';
+
+    waterBtn.disabled = false;
+    fertilizeBtn.disabled = false;
+    sellBtn.disabled = false;
+
+    coinDisplay.textContent = `金币: ${coins}`;
+    updateFlowerIcon();
+  }
+
+  function plantFlower() {
+    playClick();
+    if (flower) {
+      alert('你已经种了一朵花，先卖掉它吧~');
+      return;
+    }
+    if (coins < 50) {
+      alert('金币不足，无法种花！');
+      return;
+    }
+    coins -= 50;
+    flower = {
+      health: 50,
+      growth: 10,
+      mood: 50,
+      bloomEmoji: null
+    };
+    bloomTriggered = false;
+    updateUI();
+  }
+
+  function waterFlower() {
+    if (!flower) return;
+    playClick();
+
+    flower.health = Math.min(100, flower.health + 15);
+    flower.growth = Math.min(100, flower.growth + 10);
+    flower.mood = Math.min(100, flower.mood + 20);
+
+    updateUI();
+  }
+
+  function fertilizeFlower() {
+    if (!flower) return;
+    playClick();
+
+    flower.health = Math.min(100, flower.health + 25);
+    flower.growth = Math.min(100, flower.growth + 30);
+    flower.mood = Math.min(100, flower.mood + 10);
+
+    updateUI();
+  }
+
+  function sellFlower() {
+    if (!flower) return;
+    playClick();
+
+    if (flower.health < 10 || flower.growth < 10 || flower.mood < 10) {
+      const penalty = 30;
+      coins = Math.max(0, coins - penalty);
+      alert(`花朵状态太差了，卖花扣了 ${penalty} 金币！`);
+      flower = null;
+      bloomTriggered = false;
+      updateUI();
+      return;
+    }
+    
+    const basePrice = 10;
+    const avgStat = (flower.health + flower.growth + flower.mood) / 3;
+    const earned = Math.floor(basePrice + avgStat * 0.5);
+    coins += earned;
+
+    const flowerName = flower.bloomEmoji || '花朵';
+    const quote = quotes[Math.floor(Math.random() * quotes.length)];
+    sellDialogContent.innerHTML = `
+      <div>你今天卖出了一朵 ${flowerName}</div>
+      <div style="margin-top:12px; font-style: italic; color:#2e7d32;">“${quote}”</div>
+    `;
+    sellDialog.style.display = 'block';
+
+    flower = null;
+    bloomTriggered = false;
+    updateUI();
+  }
+
+  sellDialogClose.addEventListener('click', () => {
+    playClick();
+    sellDialog.style.display = 'none';
+  });
+
+  let musicPlaying = false;
+  function toggleMusic() {
+    if (musicPlaying) {
+      bgm.pause();
+      musicToggle.textContent = "🔈";
+    } else {
+      bgm.play().catch(() => {});
+      musicToggle.textContent = "🔊";
+    }
+    musicPlaying = !musicPlaying;
+  }
+
+  plantBtn.addEventListener('click', () => {
+    plantFlower();
+  });
+  waterBtn.addEventListener('click', waterFlower);
+  fertilizeBtn.addEventListener('click', fertilizeFlower);
+  sellBtn.addEventListener('click', sellFlower);
+  musicToggle.addEventListener('click', () => {
+    playClick();
+    toggleMusic();
+  });
+
+  updateUI();
+
+</script>
+
+<style>
+  @keyframes shakeScale {
+    0%   { transform: scale(1) rotate(0deg); }
+    25%  { transform: scale(1.15) rotate(5deg); }
+    50%  { transform: scale(1.1) rotate(-5deg); }
+    75%  { transform: scale(1.15) rotate(3deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+  .bloom-shake {
+    animation: shakeScale 0.6s ease forwards;
+  }
+
+  .progress-bar {
+    width: 200px;
+    height: 18px;
+    background: #e0f2f1;
+    border-radius: 10px;
+    margin: 4px auto 12px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: #4caf50;
+    border-radius: 10px 0 0 10px;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  .stat-label {
+    font-weight: bold;
+    color: #2e7d32;
+    margin-top: 10px;
+  }
+  .buttons button {
+    margin: 6px;
+    padding: 8px 16px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: none;
+    background-color: #81c784;
+    color: #fff;
+    cursor: pointer;
+  }
+  .buttons button:disabled {
+    background-color: #c8e6c9;
+    cursor: not-allowed;
+  }
+</style>
+
+</body>
